@@ -2,7 +2,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { cssFontFamily, FONT_FAMILIES, type FontFamily } from './fonts'
 import { toArrayBuffer } from './load'
 import { overlayFromTextTransform, previewBaselineY, renderPageToCanvas, textOverlayBoxFromPdf, viewportBox } from './render'
-import { estimateTextWidth } from './runBounds'
+import { eraseCoverWidth } from './runBounds'
 import type { AddedImage, AddedText, TextReplacement, WhiteoutRect } from './applyTextEdits'
 
 export type PagePatch = {
@@ -44,10 +44,13 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-function erasePdfWidth(fontSize: number, text: string, advanceWidth: number): number {
-  const estimate = estimateTextWidth(fontSize, text)
-  if (advanceWidth <= 0) return estimate
-  return Math.min(advanceWidth, estimate * 1.04)
+function erasePdfWidth(
+  fontSize: number,
+  originalText: string,
+  newText: string,
+  advanceWidth: number,
+): number {
+  return eraseCoverWidth(fontSize, originalText, newText, advanceWidth)
 }
 
 function backdropCss(backdrop?: TextReplacement['backdrop']): string {
@@ -84,13 +87,11 @@ export async function compositePageToPng(
   }
 
   for (const item of patch.replacements) {
-    const moved =
-      Math.abs(item.drawX - item.run.x) > 0.5 || Math.abs(item.drawY - item.run.y) > 0.5
     const eraseStr = item.newText.trim() ? item.newText : item.run.str
-    const coverText = eraseStr.length >= item.run.str.length ? eraseStr : item.run.str
     const pdfWidth = erasePdfWidth(
-      moved ? item.run.fontSize : item.fontSize,
-      moved ? item.run.str : coverText,
+      item.run.fontSize,
+      item.run.str,
+      eraseStr,
       item.run.advanceWidth,
     )
     const eraseColor = backdropCss(item.backdrop)

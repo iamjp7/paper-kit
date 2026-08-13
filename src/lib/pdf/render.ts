@@ -87,6 +87,22 @@ export function overlayFromTextTransform(
   return textOverlayBoxFromViewportBaseline(tx[4], tx[5], fontSizePx, pdfWidth * viewport.scale)
 }
 
+/** Slightly padded mask box to fully hide original PDF text under an edit overlay. */
+export function textMaskOverlay(
+  viewport: PageViewport,
+  transform: number[],
+  pdfWidth: number,
+  padPx = 3,
+) {
+  const box = overlayFromTextTransform(viewport, transform, pdfWidth)
+  return {
+    left: box.left - padPx,
+    top: box.top - padPx,
+    width: box.width + padPx * 2,
+    height: box.height + padPx * 2,
+  }
+}
+
 export type Rgb01 = { r: number; g: number; b: number }
 
 export type TextBackdrop = Rgb01 & {

@@ -21,13 +21,14 @@ import {
   renderPageToCanvas,
   renderThumbnail,
   sampleTextBackdrop,
+  textMaskOverlay,
   textOverlayBoxFromPdf,
   viewportBox,
   type TextBackdrop,
 } from '../lib/pdf/render'
 import { cssFontFamily, FONT_FAMILIES, type FontFamily, type TextLook } from '../lib/pdf/fonts'
 import { extractPageTextRuns, type PdfTextRun } from '../lib/pdf/textItems'
-import { overlayAdvanceWidth } from '../lib/pdf/runBounds'
+import { eraseCoverWidth, overlayAdvanceWidth } from '../lib/pdf/runBounds'
 
 type PlacedImage = AddedImage & { previewUrl: string }
 
@@ -106,7 +107,6 @@ export default function EditPdf() {
   const activeInputRef = useRef<HTMLInputElement>(null)
   const toolRef = useRef(tool)
   const moveRef = useRef<MoveDrag | null>(null)
-  const blockEditClickRef = useRef(false)
   const viewportRef = useRef(viewport)
   toolRef.current = tool
   viewportRef.current = viewport
@@ -230,9 +230,6 @@ export default function EditPdf() {
     }
     function onUp() {
       const drag = moveRef.current
-      if (drag?.dragging) {
-        blockEditClickRef.current = true
-      }
       if (drag?.dragging && drag.kind === 'run') {
         setTouchedRuns((prev) => new Set(prev).add(drag.id))
       }
@@ -315,6 +312,7 @@ export default function EditPdf() {
   function beginMove(kind: MoveKind, id: string, origX: number, origY: number, event: ReactPointerEvent) {
     event.stopPropagation()
     setActiveId(id)
+    event.currentTarget.setPointerCapture(event.pointerId)
     moveRef.current = {
       kind,
       id,
@@ -522,7 +520,7 @@ export default function EditPdf() {
     <div>
       <h1 className="text-3xl font-semibold text-slate-900">Edit PDF</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-600">
-        Click existing PDF text to edit it — a teal box shows the selection. Drag to move.
+        Click existing PDF text to select it (teal box). Drag to move. Double-click to edit.
         Scanned text cannot be selected — use Add text on top of it.
       </p>
 
@@ -636,8 +634,8 @@ export default function EditPdf() {
           )}
           {tool === 'select' && (
             <p className="text-sm text-slate-500">
-              {runs.length} selectable text pieces on this page. Click to rename, drag to move, or
-              press Delete to remove existing PDF text.
+              {runs.length} selectable text pieces on this page. Click to select, drag to move,
+              double-click to edit, or press Delete to remove.
             </p>
           )}
           {pendingImage && <p className="text-sm text-teal-800">Click the page to place the image.</p>}
@@ -810,20 +808,34 @@ export default function EditPdf() {
                     const fillCss = fill
                       ? `rgb(${Math.round(fill.r * 255)} ${Math.round(fill.g * 255)} ${Math.round(fill.b * 255)})`
                       : '#fff'
-                    const shadowCss = fill?.shadow
-                      ? `${fill.shadow.dx * viewport.scale}px ${-fill.shadow.dy * viewport.scale}px ${1.2 * viewport.scale}px rgb(${Math.round(fill.shadow.r * 255)} ${Math.round(fill.shadow.g * 255)} ${Math.round(fill.shadow.b * 255)})`
-                      : undefined
+                    const editedText = edits[run.id] ?? run.str
+                    const maskWidth = eraseCoverWidth(look.fontSize, run.str, editedText, run.advanceWidth)
+                    const hideOriginal = dirty || editing
                     return (
                       <div key={run.id}>
-                        {moved && (
+                        {hideOriginal && (
                           <div
                             className="pointer-events-none absolute z-[5]"
                             style={{
-                              ...overlayFromTextTransform(viewport, run.transform, run.advanceWidth),
+                              ...textMaskOverlay(viewport, run.transform, maskWidth),
                               backgroundColor: fillCss,
                             }}
                           />
                         )}
+                        {moved && hideOriginal && (() => {
+                          const movedTransform = run.transform.slice()
+                          movedTransform[4] = drawX
+                          movedTransform[5] = drawY
+                          return (
+                          <div
+                            className="pointer-events-none absolute z-[5]"
+                            style={{
+                              ...textMaskOverlay(viewport, movedTransform, maskWidth),
+                              backgroundColor: fillCss,
+                            }}
+                          />
+                          )
+                        })()}
                       <div
                         className={`absolute z-10 overflow-visible ${active ? 'z-20' : ''} ${active && !editing ? 'cursor-grab' : ''}`}
                         style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
@@ -833,16 +845,6 @@ export default function EditPdf() {
                           if (editingId === run.id) return
                           beginMove('run', run.id, drawX, drawY, event)
                         }}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (blockEditClickRef.current) {
-                            blockEditClickRef.current = false
-                            return
-                          }
-                          if (toolRef.current === 'select') {
-                            setEditingId(run.id)
-                          }
-                        }}
                         onDoubleClick={(event) => {
                           event.stopPropagation()
                           setActiveId(run.id)
@@ -850,12 +852,6 @@ export default function EditPdf() {
                           setTool('select')
                         }}
                       >
-                        {dirty && (
-                          <div
-                            className="pointer-events-none absolute"
-                            style={{ left: 0, top: 0, width: '100%', height: '100%', backgroundColor: fillCss }}
-                          />
-                        )}
                         {active && (
                           <DeleteChip onRemove={() => removePdfTextRun(run)} />
                         )}
@@ -882,7 +878,6 @@ export default function EditPdf() {
                               fontFamily: faceCss,
                               fontWeight: weight,
                               backgroundColor: fillCss,
-                              textShadow: shadowCss,
                             }}
                           />
                         ) : (
@@ -897,8 +892,7 @@ export default function EditPdf() {
                               lineHeight: 1,
                               fontFamily: faceCss,
                               fontWeight: weight,
-                              backgroundColor: 'transparent',
-                              textShadow: dirty ? shadowCss : undefined,
+                              backgroundColor: dirty ? fillCss : 'transparent',
                             }}
                           >
                             {dirty ? value : ''}

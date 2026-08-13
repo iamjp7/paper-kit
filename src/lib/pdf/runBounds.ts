@@ -28,6 +28,18 @@ export function overlayAdvanceWidth(fontSize: number, text: string, advanceWidth
   return Math.max(estimate * 1.06, capped, fontSize * 0.35)
 }
 
+/** Full width to whiteout original PDF glyphs in the editor and on export. */
+export function eraseCoverWidth(
+  fontSize: number,
+  originalText: string,
+  newText: string,
+  advanceWidth: number,
+): number {
+  const originalEstimate = estimateTextWidth(fontSize, originalText)
+  const newEstimate = estimateTextWidth(fontSize, newText || originalText)
+  return Math.max(advanceWidth, originalEstimate * 1.08, newEstimate * 1.08)
+}
+
 export function coverWidthForText(
   measured: number,
   fontSize: number,
