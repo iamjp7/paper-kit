@@ -39,8 +39,8 @@ jobs:
 
       - name: Build
         env:
-          # Default "/" for custom domain. Override in repo variables if using project URL.
-          VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/' }}
+          # /paper-kit/ for github.io project site; override with repo variable for custom domain
+          VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/paper-kit/' }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
