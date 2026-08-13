@@ -106,6 +106,7 @@ export default function EditPdf() {
   const activeInputRef = useRef<HTMLInputElement>(null)
   const toolRef = useRef(tool)
   const moveRef = useRef<MoveDrag | null>(null)
+  const blockEditClickRef = useRef(false)
   const viewportRef = useRef(viewport)
   toolRef.current = tool
   viewportRef.current = viewport
@@ -229,6 +230,9 @@ export default function EditPdf() {
     }
     function onUp() {
       const drag = moveRef.current
+      if (drag?.dragging) {
+        blockEditClickRef.current = true
+      }
       if (drag?.dragging && drag.kind === 'run') {
         setTouchedRuns((prev) => new Set(prev).add(drag.id))
       }
@@ -518,8 +522,8 @@ export default function EditPdf() {
     <div>
       <h1 className="text-3xl font-semibold text-slate-900">Edit PDF</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-600">
-        Click existing PDF text to rename it and change font in the panel. Drag selected text to
-        move. Scanned text cannot be selected — use Add text on top of it.
+        Click existing PDF text to edit it — a teal box shows the selection. Drag to move.
+        Scanned text cannot be selected — use Add text on top of it.
       </p>
 
       {!doc && (
@@ -781,14 +785,6 @@ export default function EditPdf() {
                     const drawY = pos?.y ?? run.y
                     const look = lookFor(run)
                     const value = editDisplayText(run)
-                    const overlayWidth = overlayAdvanceWidth(look.fontSize, value, run.advanceWidth)
-                    const box = textOverlayBoxFromPdf(
-                      viewport,
-                      drawX,
-                      drawY,
-                      look.fontSize,
-                      overlayWidth,
-                    )
                     const styleChanged =
                       look.family !== run.family || look.bold !== run.bold || look.fontSize !== run.fontSize
                     const dirty =
@@ -797,6 +793,17 @@ export default function EditPdf() {
                       Boolean(runLooks[run.id] && styleChanged)
                     const active = activeId === run.id
                     const editing = editingId === run.id
+                    const widthPdf =
+                      dirty || editing
+                        ? overlayAdvanceWidth(look.fontSize, value, run.advanceWidth)
+                        : run.advanceWidth
+                    const box = textOverlayBoxFromPdf(
+                      viewport,
+                      drawX,
+                      drawY,
+                      look.fontSize,
+                      widthPdf,
+                    )
                     const faceCss = cssFontFamily(look.family)
                     const weight = look.bold ? 700 : 400
                     const fill = backdrops[run.id]
@@ -826,6 +833,16 @@ export default function EditPdf() {
                           if (editingId === run.id) return
                           beginMove('run', run.id, drawX, drawY, event)
                         }}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (blockEditClickRef.current) {
+                            blockEditClickRef.current = false
+                            return
+                          }
+                          if (toolRef.current === 'select') {
+                            setEditingId(run.id)
+                          }
+                        }}
                         onDoubleClick={(event) => {
                           event.stopPropagation()
                           setActiveId(run.id)
@@ -833,7 +850,7 @@ export default function EditPdf() {
                           setTool('select')
                         }}
                       >
-                        {dirty && !editing && (
+                        {dirty && (
                           <div
                             className="pointer-events-none absolute"
                             style={{ left: 0, top: 0, width: '100%', height: '100%', backgroundColor: fillCss }}
@@ -856,7 +873,7 @@ export default function EditPdf() {
                               setEditingId(null)
                             }}
                             onPointerDown={(event) => event.stopPropagation()}
-                            className="relative block h-full w-full appearance-none border border-teal-600 py-0 text-black outline-none"
+                            className="relative block h-full w-full appearance-none border-2 border-teal-600 px-0.5 py-0 text-black outline-none ring-2 ring-teal-600/30"
                             style={{
                               fontSize: box.fontSize,
                               lineHeight: 1,
@@ -870,9 +887,11 @@ export default function EditPdf() {
                           />
                         ) : (
                           <span
-                            className={`relative block h-full w-full overflow-visible whitespace-pre border border-transparent ${
-                              dirty ? 'text-black' : 'text-transparent'
-                            }`}
+                            className={`relative block h-full w-full overflow-visible whitespace-pre px-0.5 ${
+                              active || editing
+                                ? 'box-border border-2 border-teal-600 ring-2 ring-teal-600/30'
+                                : 'border border-transparent'
+                            } ${dirty ? 'text-black' : 'text-transparent'}`}
                             style={{
                               fontSize: box.fontSize,
                               lineHeight: 1,
@@ -1058,8 +1077,8 @@ export default function EditPdf() {
             </div>
             <iframe
               title="PDF preview"
-              src={preview.url}
-              className="min-h-[70vh] w-full flex-1 bg-slate-100"
+              src={`${preview.url}#toolbar=1&navpanes=0&view=FitH`}
+              className="min-h-[75vh] w-full flex-1 border-0 bg-slate-200"
             />
           </div>
         </div>
