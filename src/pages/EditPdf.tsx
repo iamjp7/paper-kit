@@ -27,6 +27,7 @@ import {
 } from '../lib/pdf/render'
 import { cssFontFamily, FONT_FAMILIES, type FontFamily, type TextLook } from '../lib/pdf/fonts'
 import { extractPageTextRuns, type PdfTextRun } from '../lib/pdf/textItems'
+import { overlayAdvanceWidth } from '../lib/pdf/runBounds'
 
 type PlacedImage = AddedImage & { previewUrl: string }
 
@@ -65,18 +66,6 @@ function DeleteChip({ onRemove }: { onRemove: () => void }) {
     >
       ×
     </button>
-  )
-}
-
-function Grip() {
-  return (
-    <div
-      data-grip="true"
-      className="absolute -left-5 top-0 flex h-full w-5 cursor-grab items-center justify-center rounded-l bg-teal-700 text-[10px] text-white"
-      title="Drag to move"
-    >
-      ⋮⋮
-    </div>
   )
 }
 
@@ -517,13 +506,19 @@ export default function EditPdf() {
     setEdits((prev) => ({ ...prev, [run.id]: text }))
   }
 
+  function editDisplayText(run: PdfTextRun): string {
+    const value = edits[run.id] ?? run.str
+    if (edits[run.id] !== undefined) return value
+    return value.replace(/[;,.:\s]+$/, '')
+  }
+
   const pendingEditCount = countPendingEdits()
 
   return (
     <div>
       <h1 className="text-3xl font-semibold text-slate-900">Edit PDF</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-600">
-        Click existing PDF text to rename it and change font in the panel. Drag the teal handle to
+        Click existing PDF text to rename it and change font in the panel. Drag selected text to
         move. Scanned text cannot be selected — use Add text on top of it.
       </p>
 
@@ -633,7 +628,7 @@ export default function EditPdf() {
             </div>
           </div>
           {tool === 'text' && (
-            <p className="text-sm text-teal-800">Click the page to place a text box, then drag the handle to move it.</p>
+            <p className="text-sm text-teal-800">Click the page to place a text box, then drag it to move.</p>
           )}
           {tool === 'select' && (
             <p className="text-sm text-slate-500">
@@ -785,12 +780,14 @@ export default function EditPdf() {
                     const drawX = pos?.x ?? run.x
                     const drawY = pos?.y ?? run.y
                     const look = lookFor(run)
+                    const value = editDisplayText(run)
+                    const overlayWidth = overlayAdvanceWidth(look.fontSize, value, run.advanceWidth)
                     const box = textOverlayBoxFromPdf(
                       viewport,
                       drawX,
                       drawY,
                       look.fontSize,
-                      run.advanceWidth,
+                      overlayWidth,
                     )
                     const styleChanged =
                       look.family !== run.family || look.bold !== run.bold || look.fontSize !== run.fontSize
@@ -798,7 +795,6 @@ export default function EditPdf() {
                       moved ||
                       (edits[run.id] !== undefined && edits[run.id] !== run.str) ||
                       Boolean(runLooks[run.id] && styleChanged)
-                    const value = edits[run.id] ?? run.str
                     const active = activeId === run.id
                     const editing = editingId === run.id
                     const faceCss = cssFontFamily(look.family)
@@ -822,7 +818,7 @@ export default function EditPdf() {
                           />
                         )}
                       <div
-                        className={`absolute z-10 overflow-visible ${active ? 'z-20' : ''}`}
+                        className={`absolute z-10 overflow-visible ${active ? 'z-20' : ''} ${active && !editing ? 'cursor-grab' : ''}`}
                         style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
                         onPointerDown={(event) => {
                           event.stopPropagation()
@@ -837,13 +833,12 @@ export default function EditPdf() {
                           setTool('select')
                         }}
                       >
-                        {dirty && (
+                        {dirty && !editing && (
                           <div
                             className="pointer-events-none absolute"
                             style={{ left: 0, top: 0, width: '100%', height: '100%', backgroundColor: fillCss }}
                           />
                         )}
-                        {active && <Grip />}
                         {active && (
                           <DeleteChip onRemove={() => removePdfTextRun(run)} />
                         )}
@@ -853,7 +848,15 @@ export default function EditPdf() {
                             value={value}
                             title={run.str}
                             onChange={(event) => setRunText(run, event.target.value)}
-                            className="relative block h-full w-full appearance-none border border-teal-600 px-0.5 py-0 text-black outline-none"
+                            onBlur={() => {
+                              const trimmed = editDisplayText(run)
+                              if (edits[run.id] === undefined && trimmed !== run.str) {
+                                setRunText(run, trimmed)
+                              }
+                              setEditingId(null)
+                            }}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            className="relative block h-full w-full appearance-none border border-teal-600 py-0 text-black outline-none"
                             style={{
                               fontSize: box.fontSize,
                               lineHeight: 1,
@@ -867,11 +870,9 @@ export default function EditPdf() {
                           />
                         ) : (
                           <span
-                            className={`relative block h-full w-full overflow-visible whitespace-pre px-0.5 ${
-                              active
-                                ? 'box-border border border-teal-600 bg-transparent'
-                                : 'border border-transparent bg-transparent'
-                            } ${dirty ? 'text-black' : 'text-transparent'}`}
+                            className={`relative block h-full w-full overflow-visible whitespace-pre border border-transparent ${
+                              dirty ? 'text-black' : 'text-transparent'
+                            }`}
                             style={{
                               fontSize: box.fontSize,
                               lineHeight: 1,
@@ -923,7 +924,6 @@ export default function EditPdf() {
                             setEditingId(item.id)
                           }}
                         >
-                          {active && <Grip />}
                           {active && (
                             <DeleteChip
                               onRemove={() => {

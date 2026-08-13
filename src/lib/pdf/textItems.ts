@@ -54,6 +54,32 @@ async function readTextContent(doc: PDFDocumentProxy, pageIndex: number): Promis
   return textContent
 }
 
+function mergeTrailingPunctuation(runs: PdfTextRun[]): PdfTextRun[] {
+  if (runs.length < 2) return runs
+  const merged: PdfTextRun[] = []
+
+  for (const run of runs) {
+    const prev = merged[merged.length - 1]
+    const punctOnly = /^[\s;,.:)\]"']+$/.test(run.str) && run.str.length <= 3
+    const sameLine =
+      prev && Math.abs(prev.y - run.y) <= Math.max(prev.fontSize, run.fontSize) * 0.35
+    const gap = prev ? run.x - (prev.x + prev.advanceWidth) : Number.POSITIVE_INFINITY
+    const adjacent = gap >= -2 && gap <= (prev?.fontSize ?? 12) * 0.45
+
+    if (prev && punctOnly && sameLine && adjacent) {
+      const endX = run.x + run.advanceWidth
+      prev.str += run.str
+      prev.advanceWidth = endX - prev.x
+      prev.width = Math.max(prev.width, prev.advanceWidth)
+      continue
+    }
+
+    merged.push({ ...run })
+  }
+
+  return merged
+}
+
 export async function extractPageTextRuns(
   doc: PDFDocumentProxy,
   pageIndex: number,
@@ -89,5 +115,5 @@ export async function extractPageTextRuns(
     })
   }
 
-  return runs
+  return mergeTrailingPunctuation(runs)
 }

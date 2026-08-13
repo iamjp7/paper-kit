@@ -21,6 +21,13 @@ export function clampAdvanceWidth(fontSize: number, text: string, rawWidth: numb
   return rawWidth
 }
 
+/** Width for the HTML edit overlay — tight to visible text, grows when the user types more. */
+export function overlayAdvanceWidth(fontSize: number, text: string, advanceWidth: number): number {
+  const estimate = estimateTextWidth(fontSize, text)
+  const capped = advanceWidth > 0 ? Math.min(advanceWidth, estimate * 1.2) : estimate
+  return Math.max(estimate * 1.06, capped, fontSize * 0.35)
+}
+
 export function coverWidthForText(
   measured: number,
   fontSize: number,

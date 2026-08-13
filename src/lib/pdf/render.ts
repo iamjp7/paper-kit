@@ -67,11 +67,10 @@ export function textOverlayBoxFromViewportBaseline(
   fontSizePx: number,
   widthPx: number,
 ): TextOverlayBox {
-  const padX = 1
   return {
-    left: left - padX,
+    left,
     top: baseline - fontSizePx * TEXT_ASCENT_EM,
-    width: Math.max(widthPx, 12) + padX * 2,
+    width: Math.max(widthPx, fontSizePx * 0.35),
     height: fontSizePx * (TEXT_ASCENT_EM + TEXT_DESCENT_EM),
     fontSize: fontSizePx,
     baseline,
