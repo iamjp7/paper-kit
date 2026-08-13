@@ -167,7 +167,16 @@ Sign/forms, Word/JPG convert, OCR, server backend, user accounts, watermark/page
 - Logo: stacked pages + document with text lines + check badge.
 - Files: `public/favicon.svg`, `public/logo.svg`, `src/components/PaperKitLogo.tsx`.
 
-## Guidelines for agents
+## Deployment (GitHub Pages)
+
+- **URL:** https://iamjp7.github.io/paper-kit/
+- **Base path:** `/paper-kit/` via `.env.production` and `VITE_BASE_PATH` repo variable
+- **Public assets:** always use `assetUrl()` from `src/lib/assetUrl.ts` — never hardcode `/fonts/...` or other `/public` paths
+- **React Router:** `BrowserRouter` uses `import.meta.env.BASE_URL` as `basename`; route paths like `/edit` are correct (relative to basename)
+- **Build checks:** `scripts/validate-build-paths.mjs` runs after build to catch root-relative asset paths
+- **SPA fallback:** `scripts/postbuild-gh-pages.mjs` copies `index.html` → `404.html` for direct URLs like `/paper-kit/edit`
+- **Custom domain:** set repo variable `VITE_BASE_PATH=/` and add `public/CNAME`
+
 
 1. **Minimize scope** — match existing patterns; don't refactor unrelated code.
 2. **Keep processing client-side** — no uploads, no backend unless explicitly requested.

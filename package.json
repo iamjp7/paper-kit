@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node scripts/postbuild-gh-pages.mjs",
+    "build": "tsc -b && vite build && node scripts/postbuild-gh-pages.mjs && node scripts/validate-build-paths.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
