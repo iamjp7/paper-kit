@@ -1,5 +1,6 @@
 import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib'
+import { assetUrl } from '../assetUrl'
 
 export type FontFamily =
   | 'helvetica'
@@ -30,19 +31,28 @@ export const FONT_FAMILIES: FontMeta[] = [
     id: 'noto-sans',
     label: 'Noto Sans',
     css: '"Noto Sans", Helvetica, sans-serif',
-    unicode: { regular: '/fonts/NotoSans-Regular.ttf', bold: '/fonts/NotoSans-Bold.ttf' },
+    unicode: {
+      regular: assetUrl('fonts/NotoSans-Regular.ttf'),
+      bold: assetUrl('fonts/NotoSans-Bold.ttf'),
+    },
   },
   {
     id: 'noto-serif',
     label: 'Noto Serif',
     css: '"Noto Serif", Times, serif',
-    unicode: { regular: '/fonts/NotoSerif-Regular.ttf', bold: '/fonts/NotoSerif-Bold.ttf' },
+    unicode: {
+      regular: assetUrl('fonts/NotoSerif-Regular.ttf'),
+      bold: assetUrl('fonts/NotoSerif-Bold.ttf'),
+    },
   },
   {
     id: 'noto-mono',
     label: 'Noto Sans Mono',
     css: '"Noto Sans Mono", "Courier New", monospace',
-    unicode: { regular: '/fonts/NotoSansMono-Regular.ttf', bold: '/fonts/NotoSansMono-Bold.ttf' },
+    unicode: {
+      regular: assetUrl('fonts/NotoSansMono-Regular.ttf'),
+      bold: assetUrl('fonts/NotoSansMono-Bold.ttf'),
+    },
   },
 ]
 
@@ -161,4 +171,23 @@ export function safeText(font: PDFFont, value: string): string {
       })
       .join('')
   }
+}
+
+const EDITOR_FONT_FILES: { family: string; weight: number; file: string }[] = [
+  { family: 'Noto Sans', weight: 400, file: 'fonts/NotoSans-Regular.ttf' },
+  { family: 'Noto Sans', weight: 700, file: 'fonts/NotoSans-Bold.ttf' },
+  { family: 'Noto Serif', weight: 400, file: 'fonts/NotoSerif-Regular.ttf' },
+  { family: 'Noto Serif', weight: 700, file: 'fonts/NotoSerif-Bold.ttf' },
+  { family: 'Noto Sans Mono', weight: 400, file: 'fonts/NotoSansMono-Regular.ttf' },
+  { family: 'Noto Sans Mono', weight: 700, file: 'fonts/NotoSansMono-Bold.ttf' },
+]
+
+export function registerEditorFonts() {
+  const css = EDITOR_FONT_FILES.map(
+    ({ family, weight, file }) =>
+      `@font-face{font-family:"${family}";src:url("${assetUrl(file)}") format("truetype");font-weight:${weight};font-style:normal;}`,
+  ).join('')
+  const style = document.createElement('style')
+  style.textContent = css
+  document.head.appendChild(style)
 }
